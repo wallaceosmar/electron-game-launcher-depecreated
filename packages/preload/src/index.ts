@@ -1,4 +1,7 @@
 import {contextBridge} from 'electron'
+import { IpcService } from './IpcService'
+
+const ipcService = new IpcService
 
 const apiKey = 'electron'
 /**
@@ -6,6 +9,12 @@ const apiKey = 'electron'
  */
 const api: ElectronApi = {
   versions: process.versions,
+  onCloseWindow: async () => {
+    await ipcService.send('CloseWindow')
+  },
+  onMinimizeWindow: async () => {
+    await ipcService.send('MinimizeWindow')
+  },
 }
 
 if (import.meta.env.MODE !== 'test') {
