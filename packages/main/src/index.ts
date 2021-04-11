@@ -1,3 +1,4 @@
+import '/@/service/log'
 import { app } from 'electron'
 import { container } from '/@/container'
 
