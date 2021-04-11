@@ -1,0 +1,131 @@
+name: Release
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '**.spec.js'
+      - '.idea'
+      - '.gitignore'
+      - '.github/**'
+      - '!.github/workflows/release.yml'
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+
+  draft_release:
+    runs-on: ubuntu-latest
+    outputs:
+      changelog: ${{ steps.semantic.outputs.new_release_notes }}
+      version: ${{ steps.semantic.outputs.new_release_version }}
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 14
+
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v2
+        id: semantic
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save release notes
+        if: steps.semantic.outputs.new_release_published == 'true'
+        run: echo "${{ steps.semantic.outputs.new_release_notes }}" > ./buildResources/release-notes.md
+
+      - name: Waiting on All checks
+        if: steps.semantic.outputs.new_release_published == 'true'
+        uses: lewagon/wait-on-check-action@v0.2
+        with:
+          ref: ${{ github.ref }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          running-workflow-name: 'draft_release'
+
+      - name: Delete outdated drafts
+        if: steps.semantic.outputs.new_release_published == 'true'
+        uses: hugo19941994/delete-draft-releases@v0.1.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release Draft
+        if: steps.semantic.outputs.new_release_published == 'true'
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.github_token }}
+        with:
+          draft: true
+          tag_name: v${{ steps.semantic.outputs.new_release_version }}
+          name: v${{ steps.semantic.outputs.new_release_version }}
+          body_path: ./buildResources/release-notes.md
+
+  compile:
+    needs: [ draft_release ]
+    if: needs.draft_release.outputs.new_release_published == 'true'
+
+    strategy:
+      matrix:
+        os: [ windows-latest ]
+    #    To compile the application for different platforms, use:
+    #    os: [ macos-latest, ubuntu-latest, windows-latest ]
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 14
+
+      # By default, npm v6 is used, but the minimum required version is > v7.7
+      - run: npm install -g npm@latest
+
+      # TODO: Install not all dependencies, but only those required for this job
+      - uses: bahmutov/npm-install@v1
+
+      # Compile app and upload artifacts
+      - name: Compile & release Electron app
+        uses: samuelmeuli/action-electron-builder@v1
+        env:
+          VERSION: ${{ needs.draft_release.outputs.version }}
+        with:
+          build_script_name: build
+          args: --config electron-builder.config.js
+
+          # GitHub token, automatically provided to the action
+          # (No need to define this secret in the repo settings)
+          github_token: ${{ secrets.github_token }}
+
+          # If the commit is tagged with a version (e.g. "v1.0.0"),
+          # release the app after building
+          release: true
+
+          # Sometimes the build may fail due to a connection problem with Apple, GitHub, etc. servers.
+          # This option will restart the build as many attempts as possible
+          max_attempts: 3
+
+
+          # Code Signing params
+
+          # Base64-encoded code signing certificate for Windows
+          # windows_certs: ''
+
+          # Password for decrypting `windows_certs`
+          # windows_certs_password: ''
+
+          # Base64-encoded code signing certificate for macOS
+          # mac_certs: ''
+
+          # Password for decrypting `mac_certs`
+          # mac_certs_password: ''
