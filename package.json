@@ -1,5 +1,5 @@
 {
-  "name": "vite-electron-react-builder",
+  "name": "electron-game-launcher",
   "version": "v0.0.0-development",
   "private": true,
   "license": "MIT",
@@ -10,6 +10,7 @@
   },
   "main": "packages/main/dist/index.cjs",
   "scripts": {
+    "postinstall": "install-app-deps",
     "buildEnvTypes": "node scripts/buildEnvTypes.js",
     "build": "node scripts/build.js",
     "precompile": "cross-env MODE=production npm run build",
