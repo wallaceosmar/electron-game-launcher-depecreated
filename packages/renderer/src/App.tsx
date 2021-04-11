@@ -11,7 +11,7 @@ const App: React.FC = () => {
         <img src={logo} className="App-logo" alt="logo" />
         <p>Hello Vite + React!</p>
         <p>
-          <button onClick={() => setCount((count) => count + 1)}>
+          <button className="bg-purple-400 focus:outline-none px-1.5" onClick={() => setCount((count) => count + 1)}>
             count is: {count}
           </button>
         </p>
